@@ -3,3 +3,5 @@
 .RData
 .Ruserdata
 *.csv
+
+!data/vader_sent.csv
