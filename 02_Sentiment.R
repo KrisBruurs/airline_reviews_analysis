@@ -13,6 +13,9 @@ reviews <- data_raw %>%
   select(id, `Airline Name`, Overall_Rating, Review_Title, `Review Date`,
          Review, Verified, `Type Of Traveller`, Recommended)
 
+vader_sentiment <- read_csv('data/vader_sent.csv')
+
+
 ###---Transform---###
 
 ##--Bing sentiment--##
@@ -52,8 +55,10 @@ accuracy_bing <- reviews %>%
   mutate(sentiment_bing = as.factor(sentiment_bing),
          Recommended_2  = as.factor(Recommended_2))
 
-accuracy(accuracy_bing,
-         Recommended_2, sentiment_bing) # 83.8% accuracy compared to recommended
+bing_acc <- accuracy(accuracy_bing,
+         Recommended_2, sentiment_bing) %>% 
+  pull(.estimate) %>%
+  { round(. * 100, 2) }
 
 ##--afinn sentiment--##
 tokens_afinn <- tokens %>% 
@@ -79,14 +84,49 @@ accuracy_afinn <- reviews %>%
   mutate(sentiment_afinn = as.factor(sentiment_afinn),
          Recommended_2  = as.factor(Recommended_2))
 
-accuracy(accuracy_afinn,
-         Recommended_2, sentiment_afinn) # 82.6% accuracy 
+afinn_acc <- accuracy(accuracy_afinn,
+         Recommended_2, sentiment_afinn) %>% 
+  pull(.estimate) %>%
+  { round(. * 100, 2) }
 
-reviews <- reviews %>% 
-  mutate(sentiment_bing = as.factor(sentiment_bing),
-         sentiment_afinn = as.factor(sentiment_afinn))
-accuracy(reviews,
-         sentiment_bing, sentiment_afinn) # 78.7% accuracy
 
 ##--VADER sentiment--##
-vader_sentiment <- vader_df(reviews$)
+
+vader_sent2 <- vader_sentiment %>% 
+  rowid_to_column("id") %>% 
+  mutate(sentiment_vader = case_when(
+    compound > 0.05 ~ 'positive',
+    compound < -0.05 ~ 'negative',
+    .default = 'neutral'
+  )) %>% 
+  select(id, sentiment_vader) %>% 
+  mutate(
+    id = as.numeric(id),
+    sentiment_vader = as.factor(sentiment_vader))
+
+reviews <- reviews %>% 
+  left_join(vader_sent2, by = 'id')
+
+accuracy_vader <- reviews %>% 
+  select(id, Recommended_2, sentiment_vader) %>% 
+  filter(sentiment_vader %in% c('positive', 'negative'),
+         Recommended_2 %in% c('positive', 'negative')) %>%
+  mutate(
+    sentiment_vader = factor(sentiment_vader, levels = c('positive', 'negative')),
+    Recommended_2 = factor(Recommended_2, levels = c('positive', 'negative'))
+  )
+
+vader_acc <- accuracy(accuracy_vader,
+                      Recommended_2, sentiment_vader) %>%
+  pull(.estimate) %>%
+  { round(. * 100, 2) }
+
+positive_reviews <- reviews %>% 
+  filter(sentiment_vader == 'positive')
+
+negative_reviews <- reviews %>% 
+  filter(sentiment_vader == 'negative')
+
+###---Output---###
+write_csv(positive_reviews, 'data/positive_reviews.csv')
+write_csv(negative_reviews, 'data/negative_reviews.csv')
