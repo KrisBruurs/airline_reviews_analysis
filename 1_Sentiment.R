@@ -42,22 +42,51 @@ reviews <- reviews %>%
   left_join(sentiment_bing, by = 'id')
 
 reviews <- reviews %>% 
-  mutate(Recommended = case_when(
+  mutate(Recommended_2 = case_when(
     Recommended == 'yes' ~ 'positive',
     Recommended == 'no' ~ 'negative'
   ))
 
-
-
 accuracy_bing <- reviews %>% 
   filter(sentiment_bing != 'neutral') %>% 
   mutate(sentiment_bing = as.factor(sentiment_bing),
-         Recommended  = as.factor(Recommended))
+         Recommended_2  = as.factor(Recommended_2))
 
 accuracy(accuracy_bing,
-         Recommended, sentiment_bing) # 83% accuracy compared to recommended
+         Recommended_2, sentiment_bing) # 83.8% accuracy compared to recommended
 
+##--afinn sentiment--##
+tokens_afinn <- tokens %>% 
+  left_join(get_sentiments('afinn')) %>% 
+  mutate(value = replace_na(value, 0))
 
-##--anfinn sentiment--##
+sentiment_afinn <- tokens_afinn %>% 
+  group_by(id) %>% 
+  summarise(score = sum(value, na.rm = TRUE)) %>% 
+  ungroup %>% 
+  mutate(sentiment_afinn = case_when(
+    score > 0 ~ 'positive',
+    score < 0 ~ 'negative',
+    .default = 'neutral'
+  )) %>% 
+  select(!score)
 
+reviews <- reviews %>% 
+  left_join(sentiment_afinn, by = 'id')
+
+accuracy_afinn <- reviews %>% 
+  filter(sentiment_afinn != 'neutral') %>% 
+  mutate(sentiment_afinn = as.factor(sentiment_afinn),
+         Recommended_2  = as.factor(Recommended_2))
+
+accuracy(accuracy_afinn,
+         Recommended_2, sentiment_afinn) # 82.6% accuracy 
+
+reviews <- reviews %>% 
+  mutate(sentiment_bing = as.factor(sentiment_bing),
+         sentiment_afinn = as.factor(sentiment_afinn))
+accuracy(reviews,
+         sentiment_bing, sentiment_afinn) # 78.7% accuracy
+
+##--VADER sentiment--##
 
